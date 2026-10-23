@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#102850">
+  <title>Painel da Roleta | Contabilidade Facilitada</title>
+  <link rel="icon" href="/assets/img/logo-cf-icone.png">
+  <link rel="preload" href="/assets/fonts/montserrat-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="topo-marca">
+      <img src="/assets/img/logo-cf-branco.png" alt="Contabilidade Facilitada">
+      <span class="topo-titulo">Painel da Roleta</span>
+    </div>
+    <div class="topo-direita">
+      <span class="atualizacao" id="statusAtualizacao" role="status">Carregando…</span>
+      <button class="botao" id="btnAtualizar" type="button">Atualizar</button>
+      <span class="usuario" id="usuario"></span>
+    </div>
+  </header>
+
+  <main class="conteudo" id="conteudo">
+    <!-- Filtros: valem para todos os números, gráficos e tabelas abaixo -->
+    <div class="filtros">
+      <div class="segmentado" id="filtroPeriodo" role="group" aria-label="Período">
+        <button type="button" data-periodo="hoje">Hoje</button>
+        <button type="button" data-periodo="7">7 dias</button>
+        <button type="button" data-periodo="30">30 dias</button>
+        <button type="button" data-periodo="tudo">Tudo</button>
+      </div>
+      <label class="filtro">
+        <span>Evento</span>
+        <select id="filtroEvento"></select>
+      </label>
+      <label class="filtro">
+        <span>Aparelho</span>
+        <select id="filtroAparelho"></select>
+      </label>
+    </div>
+
+    <section class="kpis" aria-label="Resumo">
+      <article class="kpi">
+        <h2>Giros</h2>
+        <p class="kpi-valor" id="kpiGiros">0</p>
+        <p class="kpi-sub" id="kpiGirosSub"></p>
+      </article>
+      <article class="kpi">
+        <h2>Prêmios distribuídos</h2>
+        <p class="kpi-valor" id="kpiPremios">0</p>
+        <p class="kpi-sub" id="kpiPremiosSub"></p>
+      </article>
+      <article class="kpi">
+        <h2>Cupons emitidos</h2>
+        <p class="kpi-valor" id="kpiCupons">0</p>
+        <p class="kpi-sub" id="kpiCuponsSub"></p>
+      </article>
+      <article class="kpi">
+        <h2>Cupons resgatados</h2>
+        <p class="kpi-valor" id="kpiResgatados">0</p>
+        <p class="kpi-sub" id="kpiResgatadosSub"></p>
+      </article>
+    </section>
+
+    <section class="graficos">
+      <article class="cartao">
+        <header class="cartao-topo">
+          <div>
+            <h2>Giros ao longo do tempo</h2>
+            <p class="cartao-sub" id="subTempo"></p>
+          </div>
+          <button class="botao botao-leve" id="btnExportarGiros" type="button">Exportar giros</button>
+        </header>
+        <div class="grafico-tempo" id="graficoTempo"></div>
+        <details class="ver-tabela">
+          <summary>Ver em tabela</summary>
+          <div class="tabela-rolagem" id="tabelaTempo"></div>
+        </details>
+      </article>
+
+      <article class="cartao">
+        <header class="cartao-topo">
+          <div>
+            <h2>Resultados por prêmio</h2>
+            <p class="cartao-sub">Quantidade e percentual dos giros</p>
+          </div>
+        </header>
+        <div class="barras" id="graficoPremios"></div>
+      </article>
+    </section>
+
+    <section class="cartao">
+      <header class="cartao-topo">
+        <div>
+          <h2>Ganhadores de cupom</h2>
+          <p class="cartao-sub" id="subGanhadores"></p>
+        </div>
+        <button class="botao botao-leve" id="btnExportarCadastros" type="button">Exportar ganhadores</button>
+      </header>
+
+      <div class="filtros-tabela">
+        <input class="busca" id="busca" type="search" placeholder="Buscar por nome, e-mail, telefone ou código" aria-label="Buscar ganhador">
+        <select id="filtroPremio" aria-label="Prêmio"></select>
+        <select id="filtroSituacao" aria-label="Situação">
+          <option value="">Todas as situações</option>
+          <option value="emitido">Não resgatados</option>
+          <option value="resgatado">Resgatados</option>
+        </select>
+      </div>
+
+      <div class="tabela-rolagem">
+        <table class="tabela tabela-ganhadores">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Ganhador</th>
+              <th>Prêmio e código</th>
+              <th>Evento</th>
+              <th>Comunicações</th>
+              <th>Situação</th>
+              <th><span class="sr">Ações</span></th>
+            </tr>
+          </thead>
+          <tbody id="tabelaCadastros"></tbody>
+        </table>
+      </div>
+      <button class="botao botao-leve mostrar-mais" id="btnMostrarMais" type="button" hidden></button>
+    </section>
+  </main>
+
+  <div class="dica" id="dica" role="tooltip"></div>
+
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

@@ -6,7 +6,9 @@
 
   /* ---------- Configuração dos prêmios ----------
      linhas: [texto, escala da fonte, peso da fonte] desenhadas na fatia, de fora para dentro.
-     Os textos do resultado (titulo, subtitulo, nota) podem ser editados livremente. */
+     Os textos do resultado (titulo, subtitulo, nota) podem ser editados livremente.
+     cupom: prefixo do código do cupom. Prêmios com cupom abrem o cadastro do ganhador;
+     mantenha igual a functions/_lib/premios.js, que o servidor usa para validar. */
   const PREMIOS = {
     caneta: {
       nome: 'Caneta',
@@ -23,7 +25,7 @@
       linhas: [['1 MÊS', 1.05, 900], ['GRÁTIS', .78, 900], ['ESCOLA CONTÁBIL', .5, 700]],
       icone: 'escola',
       cor: '#102850', texto: '#ffffff', destaque: '#ff9933',
-      ganha: true, controlaEstoque: true,
+      ganha: true, controlaEstoque: true, cupom: 'EC1M',
       titulo: '1 mês de Escola Contábil grátis',
       subtitulo: 'Você ganhou 1 mês de acesso à Escola Contábil!',
       nota: 'Procure a nossa equipe para resgatar o seu prêmio.',
@@ -45,7 +47,7 @@
       linhas: [['20%', 1.5, 900], ['DE DESCONTO', .58, 800]],
       icone: 'desconto',
       cor: '#ec7a1c', texto: '#ffffff', destaque: '#102850',
-      ganha: true, controlaEstoque: true,
+      ganha: true, controlaEstoque: true, cupom: 'CF20',
       titulo: '20% de desconto',
       subtitulo: 'Desconto de 20%, não cumulativo.',
       nota: 'Procure a nossa equipe para resgatar o seu desconto.'
@@ -67,6 +69,13 @@
 
   // Ordem de exibição na lista lateral
   const LISTA_LATERAL = ['caneta', 'ecobag', 'escola', 'desconto'];
+
+  // Endereço da política de privacidade exibido no cadastro do ganhador. Em branco, o link não aparece.
+  const POLITICA_PRIVACIDADE = '';
+
+  // Rota do servidor que recebe giros e cadastros (Cloudflare Pages Functions)
+  const ENDERECO_ENVIO = '/api/sincronizar';
+  const INTERVALO_ENVIO_MS = 20000;
 
   const ICONES = {
     caneta: ['M12 20h9', 'M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'],
@@ -99,6 +108,22 @@
       ICONES[nome].map((d) => `<path d="${d}"/>`).join('') + '</svg>';
   }
 
+  // Identificador do giro, gerado no aparelho para que o reenvio não duplique registros
+  function novoId() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    const v = new Uint8Array(16);
+    crypto.getRandomValues(v);
+    return Array.from(v, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Código do cupom: prefixo + 8 caracteres sem os ambíguos 0, O, 1 e I (ex.: CF20-K7Q2X9MP)
+  function gerarCodigo(prefixo) {
+    const ALFABETO = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const v = new Uint8Array(8);
+    crypto.getRandomValues(v);
+    return `${prefixo}-${Array.from(v, (b) => ALFABETO[b % 32]).join('')}`;
+  }
+
   // Clareia (fator > 0) ou escurece (fator < 0) uma cor hexadecimal
   function ajustarCor(hex, fator) {
     const n = parseInt(hex.slice(1), 16);
@@ -116,7 +141,11 @@
       pesos: { caneta: 20, escola: 20, ecobag: 20, desconto: 20, tente: 20 },
       estoque: { caneta: null, escola: null, ecobag: null, desconto: null },
       som: true,
-      historico: []
+      historico: [],
+      // Identificação do aparelho e situação do envio ao servidor
+      sinc: { evento: '', aparelho: '', chave: '', ultimoEnvio: null, erro: '', recusados: [] },
+      // Giros e cadastros ainda não confirmados pelo servidor
+      fila: { giros: [], cadastros: [] }
     };
   }
 
@@ -130,7 +159,12 @@
           ...salvo,
           pesos: { ...padrao.pesos, ...salvo.pesos },
           estoque: { ...padrao.estoque, ...salvo.estoque },
-          historico: Array.isArray(salvo.historico) ? salvo.historico : []
+          historico: Array.isArray(salvo.historico) ? salvo.historico : [],
+          sinc: { ...padrao.sinc, ...salvo.sinc },
+          fila: {
+            giros: Array.isArray(salvo.fila && salvo.fila.giros) ? salvo.fila.giros : [],
+            cadastros: Array.isArray(salvo.fila && salvo.fila.cadastros) ? salvo.fila.cadastros : []
+          }
         };
       }
     } catch (e) { /* armazenamento indisponível */ }
@@ -512,9 +546,18 @@
     if (p.controlaEstoque && estado.estoque[id] !== null) {
       estado.estoque[id] = Math.max(0, estado.estoque[id] - 1);
     }
-    estado.historico.push({ t: Date.now(), id });
+    const giro = {
+      id: novoId(),
+      momento: Date.now(),
+      premio: id,
+      evento: estado.sinc.evento,
+      aparelho: estado.sinc.aparelho
+    };
+    estado.historico.push({ t: giro.momento, id, giro: giro.id });
+    estado.fila.giros.push(giro);
     salvar();
     renderizarPainel();
+    sincronizar();
 
     mostrarHolofote(indice);
     if (p.ganha) {
@@ -531,7 +574,7 @@
       vibrar(150);
     }
 
-    setTimeout(() => mostrarResultado(id), p.ganha ? 1100 : 800);
+    setTimeout(() => mostrarResultado(id, giro.id), p.ganha ? 1100 : 800);
   }
 
   /* ---------- Arrastar e lançar a roda (dedo ou mouse) ---------- */
@@ -615,9 +658,13 @@
     });
   }
 
-  function mostrarResultado(id) {
+  function mostrarResultado(id, giroId) {
     const p = PREMIOS[id];
     resultado.classList.toggle('derrota', !p.ganha);
+    resultado.classList.remove('registrado');
+    resultado.classList.toggle('com-cadastro', Boolean(p.cupom));
+    cadastroAberto = p.cupom ? { id, giroId } : null;
+    if (p.cupom) limparCadastro();
     $('#resultadoIcone').innerHTML = svgIcone(p.icone);
     $('#resultadoSobre').textContent = p.ganha ? 'PARABÉNS!' : 'QUASE!';
     animarTitulo($('#resultadoTitulo'), p.titulo);
@@ -637,7 +684,8 @@
   }
 
   function fecharResultado(permitirNovoGiro = true) {
-    if (!resultado.classList.contains('aberto')) return;
+    // Com o cadastro aberto, só "Gerar cupom" ou "Pular cadastro" fecham o resultado
+    if (!resultado.classList.contains('aberto') || cadastroAberto) return;
     const girarDeNovo = permitirNovoGiro && botaoResultado.dataset.girarDeNovo === '1';
     resultado.classList.remove('aberto');
     holofote.classList.remove('ativo');
@@ -649,6 +697,180 @@
     desenharRoda();
     renderizarLista();
     if (girarDeNovo) setTimeout(girar, 500);
+  }
+
+  /* ---------- Cadastro do ganhador de cupom ---------- */
+
+  let cadastroAberto = null;   // { id do prêmio, id do giro } enquanto o formulário está na tela
+  const formCadastro = $('#cadastro');
+  const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  function limparCadastro() {
+    formCadastro.reset();
+    $('#cadErro').textContent = '';
+    formCadastro.querySelectorAll('.invalido').forEach((el) => el.classList.remove('invalido'));
+  }
+
+  // (11) 98765-4321 enquanto digita; números com mais de 11 dígitos (DDI) ficam sem máscara
+  function formatarTelefone(valor) {
+    const d = valor.replace(/\D/g, '');
+    if (d.length > 11) return d.slice(0, 13);
+    if (d.length <= 2) return d.length ? `(${d}` : '';
+    const meio = d.length > 10 ? 7 : 6;
+    if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, meio)}-${d.slice(meio)}`;
+  }
+
+  function enviarCadastro(e) {
+    e.preventDefault();
+    if (!cadastroAberto) return;
+    const nome = $('#cadNome').value.trim().replace(/\s+/g, ' ');
+    const email = $('#cadEmail').value.trim().toLowerCase();
+    const telefone = $('#cadTelefone').value.replace(/\D/g, '');
+
+    const erros = [];
+    const marcar = (sel, invalido) => $(sel).classList.toggle('invalido', invalido);
+    marcar('#cadNome', nome.length < 2);
+    marcar('#cadEmail', !EMAIL_VALIDO.test(email));
+    marcar('#cadTelefone', telefone.length < 10 || telefone.length > 13);
+    if (nome.length < 2) erros.push('o nome');
+    if (!EMAIL_VALIDO.test(email)) erros.push('um e-mail válido');
+    if (telefone.length < 10 || telefone.length > 13) erros.push('o telefone com DDD');
+    if (erros.length) {
+      $('#cadErro').textContent = `Informe ${erros.join(', ').replace(/, ([^,]*)$/, ' e $1')}.`;
+      formCadastro.querySelector('.invalido').focus();
+      return;
+    }
+
+    const { id, giroId } = cadastroAberto;
+    const codigo = gerarCodigo(PREMIOS[id].cupom);
+    estado.fila.cadastros.push({
+      giro: giroId, codigo, nome, email, telefone,
+      marketing: $('#cadMarketing').checked,
+      momento: Date.now()
+    });
+    const registro = estado.historico.find((h) => h.giro === giroId);
+    if (registro) registro.codigo = codigo;
+    salvar();
+    renderizarPainel();
+    sincronizar();
+
+    cadastroAberto = null;
+    if (document.activeElement) document.activeElement.blur();
+    limparCadastro();
+    $('#cupomCodigo').textContent = codigo;
+    resultado.classList.add('registrado');
+    botaoResultado.textContent = 'Próximo participante';
+  }
+
+  function pularCadastro() {
+    if (!cadastroAberto) return;
+    cadastroAberto = null;
+    limparCadastro();
+    if (document.activeElement) document.activeElement.blur();
+    fecharResultado();
+  }
+
+  /* ---------- Envio ao servidor ----------
+     Giros e cadastros entram numa fila guardada no aparelho e saem em lotes. O que o servidor
+     confirma (ou recusa por estar inválido) sai da fila; o resto é reenviado na próxima tentativa. */
+
+  let enviando = false;
+
+  async function sincronizar() {
+    const { giros, cadastros } = estado.fila;
+    if (enviando || (!giros.length && !cadastros.length)) return;
+    if (location.protocol === 'file:' || !estado.sinc.chave) {
+      atualizarStatusEnvio();
+      return;
+    }
+
+    enviando = true;
+    const lote = { giros: giros.slice(0, 200), cadastros: cadastros.slice(0, 100) };
+    let continuar = false;
+    try {
+      const r = await fetch(ENDERECO_ENVIO, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Chave-Operador': estado.sinc.chave },
+        body: JSON.stringify(lote)
+      });
+      if (r.status === 401) {
+        estado.sinc.erro = 'Chave do aparelho recusada pelo servidor.';
+      } else if (!r.ok) {
+        estado.sinc.erro = `O servidor respondeu com erro ${r.status}.`;
+      } else {
+        const resp = await r.json();
+        const saiGiro = new Set([...resp.giros.aceitos, ...resp.giros.rejeitados.map((x) => x.id)]);
+        const saiCadastro = new Set([...resp.cadastros.aceitos, ...resp.cadastros.rejeitados.map((x) => x.giro)]);
+        estado.fila.giros = estado.fila.giros.filter((g) => !saiGiro.has(g.id));
+        estado.fila.cadastros = estado.fila.cadastros.filter((c) => !saiCadastro.has(c.giro));
+
+        const recusados = [
+          ...resp.giros.rejeitados.map((x) => ({ t: Date.now(), tipo: 'giro', motivo: x.motivo })),
+          ...resp.cadastros.rejeitados.map((x) => ({ t: Date.now(), tipo: 'cadastro', motivo: x.motivo }))
+        ];
+        if (recusados.length) {
+          estado.sinc.recusados = [...estado.sinc.recusados, ...recusados].slice(-20);
+          console.warn('Itens recusados pelo servidor:', resp.giros.rejeitados, resp.cadastros.rejeitados);
+        }
+        estado.sinc.ultimoEnvio = Date.now();
+        estado.sinc.erro = '';
+        // Continua se ainda há itens além deste lote (cadastros pendentes esperam o próximo ciclo)
+        continuar = estado.fila.giros.length > 0 || estado.fila.cadastros.length > resp.cadastros.pendentes.length;
+      }
+    } catch (e) {
+      estado.sinc.erro = 'Sem conexão com o servidor. Os dados continuam guardados neste aparelho.';
+    }
+    enviando = false;
+    salvar();
+    atualizarStatusEnvio();
+    if (continuar) sincronizar();
+  }
+
+  function atualizarStatusEnvio() {
+    const el = $('#sincStatus');
+    if (!el) return;
+    const { giros, cadastros } = estado.fila;
+    const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+    const hora = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    let situacao;
+    let tipo = 'ok';
+    if (location.protocol === 'file:') {
+      situacao = 'Aberto direto do arquivo: o envio só funciona pelo endereço publicado.';
+      tipo = 'alerta';
+    } else if (!estado.sinc.chave) {
+      situacao = 'Informe a chave do aparelho para enviar os dados.';
+      tipo = 'alerta';
+    } else if (estado.sinc.erro) {
+      situacao = estado.sinc.erro;
+      tipo = 'alerta';
+    } else if (giros.length || cadastros.length) {
+      situacao = 'Enviando…';
+    } else {
+      situacao = 'Tudo enviado.';
+    }
+
+    const pendentes = giros.length || cadastros.length
+      ? `Na fila: ${plural(giros.length, 'giro', 'giros')} e ${plural(cadastros.length, 'cadastro', 'cadastros')}.`
+      : '';
+    const ultimo = estado.sinc.ultimoEnvio ? `Último envio às ${hora.format(estado.sinc.ultimoEnvio)}.` : '';
+    const recusados = estado.sinc.recusados.length
+      ? `${plural(estado.sinc.recusados.length, 'item recusado', 'itens recusados')} pelo servidor (último motivo: ${estado.sinc.recusados[estado.sinc.recusados.length - 1].motivo}).`
+      : '';
+
+    el.dataset.tipo = tipo;
+    el.textContent = [situacao, pendentes, ultimo, recusados].filter(Boolean).join(' ');
+  }
+
+  function atualizarCampoEnvio(e) {
+    const campo = { sincEvento: 'evento', sincAparelho: 'aparelho', sincChave: 'chave' }[e.target.id];
+    if (!campo) return;
+    estado.sinc[campo] = e.target.value.trim();
+    if (campo === 'chave') estado.sinc.erro = '';
+    salvar();
+    atualizarStatusEnvio();
+    if (campo === 'chave') sincronizar();
   }
 
   /* ---------- Confete ---------- */
@@ -784,8 +1006,13 @@
 
     const fmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const itens = estado.historico.slice(-100).reverse()
-      .map((h) => `<li><span>${fmt.format(h.t)}</span><span>${PREMIOS[h.id] ? PREMIOS[h.id].nome : h.id}</span></li>`);
+      .map((h) => `<li><span>${fmt.format(h.t)}</span><span>${PREMIOS[h.id] ? PREMIOS[h.id].nome : h.id}${h.codigo ? `<b class="codigo">${h.codigo}</b>` : ''}</span></li>`);
     $('#historico').innerHTML = itens.length ? itens.join('') : '<li class="vazio">Nenhum giro registrado.</li>';
+
+    $('#sincEvento').value = estado.sinc.evento;
+    $('#sincAparelho').value = estado.sinc.aparelho;
+    $('#sincChave').value = estado.sinc.chave;
+    atualizarStatusEnvio();
   }
 
   function atualizarCampo(e) {
@@ -805,10 +1032,10 @@
   }
 
   function exportarCsv() {
-    const linhas = [['Data', 'Hora', 'Resultado']];
+    const linhas = [['Data', 'Hora', 'Resultado', 'Código do cupom']];
     estado.historico.forEach((h) => {
       const d = new Date(h.t);
-      linhas.push([d.toLocaleDateString('pt-BR'), d.toLocaleTimeString('pt-BR'), PREMIOS[h.id] ? PREMIOS[h.id].nome : h.id]);
+      linhas.push([d.toLocaleDateString('pt-BR'), d.toLocaleTimeString('pt-BR'), PREMIOS[h.id] ? PREMIOS[h.id].nome : h.id, h.codigo || '']);
     });
     const csv = '﻿' + linhas.map((l) => l.join(';')).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -877,6 +1104,16 @@
   $('#btnPainel').addEventListener('click', (e) => { e.currentTarget.blur(); alternarPainel(); });
   $('#painelFechar').addEventListener('click', () => alternarPainel(false));
   $('#tabelaPremios').addEventListener('change', atualizarCampo);
+  $('.campos-sinc').addEventListener('change', atualizarCampoEnvio);
+  $('#btnEnviar').addEventListener('click', () => {
+    estado.sinc.erro = '';
+    sincronizar();
+    atualizarStatusEnvio();
+  });
+  formCadastro.addEventListener('submit', enviarCadastro);
+  $('#cadPular').addEventListener('click', pularCadastro);
+  $('#cadTelefone').addEventListener('input', (e) => { e.target.value = formatarTelefone(e.target.value); });
+  formCadastro.addEventListener('input', (e) => e.target.classList.remove('invalido'));
   $('#btnExportar').addEventListener('click', exportarCsv);
   $('#btnZerar').addEventListener('click', () => {
     if (!confirm('Apagar todo o histórico de giros?')) return;
@@ -895,9 +1132,11 @@
     desenharRoda();
   });
 
+  // Campos e botões do cadastro mantêm o comportamento normal do teclado
+  const noFormulario = (alvo) => alvo instanceof HTMLInputElement || (alvo instanceof Element && alvo.closest('form'));
+
   document.addEventListener('keydown', (e) => {
-    const digitando = e.target instanceof HTMLInputElement;
-    if (digitando) {
+    if (noFormulario(e.target)) {
       if (e.key === 'Escape') e.target.blur();
       return;
     }
@@ -919,7 +1158,7 @@
   });
 
   document.addEventListener('keyup', (e) => {
-    if ((e.key === ' ' || e.key === 'Enter') && !(e.target instanceof HTMLInputElement)) e.preventDefault();
+    if ((e.key === ' ' || e.key === 'Enter') && !noFormulario(e.target)) e.preventDefault();
   });
 
   // Toque: evita o menu de pressão longa na roda e o zoom de pinça do Safari
@@ -932,11 +1171,20 @@
   // O iPhone não permite tela cheia em páginas; nele, use "Adicionar à Tela de Início"
   if (!document.fullscreenEnabled) $('#btnTelaCheia').style.display = 'none';
 
+  if (POLITICA_PRIVACIDADE) {
+    $('#cadPolitica').href = POLITICA_PRIVACIDADE;
+    $('#cadPolitica').hidden = false;
+  }
+
   criarLampadas();
   criarFaiscas();
   atualizarBotaoSom();
   renderizarLista();
   renderizarPainel();
+
+  sincronizar();
+  setInterval(sincronizar, INTERVALO_ENVIO_MS);
+  window.addEventListener('online', sincronizar);
 
   new ResizeObserver(() => desenharRoda()).observe(canvas);
   Promise.all([

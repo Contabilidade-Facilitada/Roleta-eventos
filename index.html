@@ -110,6 +110,43 @@
       <p class="resultado-sub" id="resultadoSub"></p>
       <img class="resultado-imagem" id="resultadoImagem" alt="">
       <p class="resultado-nota" id="resultadoNota"></p>
+
+      <!-- Cadastro do ganhador de cupom, preenchido pelo operador -->
+      <form class="cadastro" id="cadastro" novalidate autocomplete="off">
+        <p class="cadastro-titulo">Cadastre o ganhador para gerar o cupom</p>
+        <label class="campo campo-largo">
+          <span>Nome</span>
+          <input id="cadNome" name="participante-nome" maxlength="120" autocomplete="off" autocapitalize="words" spellcheck="false">
+        </label>
+        <label class="campo">
+          <span>E-mail</span>
+          <input id="cadEmail" name="participante-email" type="email" inputmode="email" maxlength="160" autocomplete="off" autocapitalize="off" spellcheck="false">
+        </label>
+        <label class="campo">
+          <span>Telefone</span>
+          <input id="cadTelefone" name="participante-telefone" type="tel" inputmode="tel" maxlength="20" autocomplete="off" placeholder="(11) 98765-4321">
+        </label>
+        <label class="aceite campo-largo">
+          <input id="cadMarketing" type="checkbox">
+          <span>Aceito receber novidades e ofertas do Contabilidade Facilitada.</span>
+        </label>
+        <p class="cadastro-aviso campo-largo">
+          Usamos estes dados para emitir e validar o cupom.
+          <a id="cadPolitica" target="_blank" rel="noopener" hidden>Política de privacidade</a>
+        </p>
+        <p class="cadastro-erro campo-largo" id="cadErro" role="alert"></p>
+        <div class="cadastro-botoes campo-largo">
+          <button class="botao-resultado" type="submit">Gerar cupom</button>
+          <button class="botao-pular" id="cadPular" type="button">Pular cadastro</button>
+        </div>
+      </form>
+
+      <div class="cupom" id="cupom">
+        <p class="cupom-rotulo">Código do cupom</p>
+        <p class="cupom-codigo" id="cupomCodigo"></p>
+        <p class="cupom-dica">Fotografe ou anote este código. Ele também fica no histórico do painel do operador.</p>
+      </div>
+
       <button class="botao-resultado" id="botaoResultado" type="button"></button>
     </div>
   </div>
@@ -130,6 +167,18 @@
         </thead>
         <tbody id="tabelaPremios"></tbody>
       </table>
+
+      <h3>Envio ao painel</h3>
+      <p class="painel-ajuda">Giros e cadastros ficam guardados neste aparelho e são enviados ao painel <strong>/admin</strong> sempre que houver internet. Preencha o evento e o nome do aparelho antes de começar.</p>
+      <div class="campos-sinc">
+        <label><span>Evento</span><input id="sincEvento" maxlength="80" placeholder="Ex.: Convenção Contábil 2026"></label>
+        <label><span>Aparelho</span><input id="sincAparelho" maxlength="40" placeholder="Ex.: Tablet 1"></label>
+        <label class="campo-largo"><span>Chave do aparelho</span><input id="sincChave" type="password" autocomplete="off" placeholder="Fornecida pela equipe responsável"></label>
+      </div>
+      <p class="sinc-status" id="sincStatus"></p>
+      <div class="painel-botoes">
+        <button type="button" id="btnEnviar">Enviar agora</button>
+      </div>
 
       <h3>Histórico <span id="resumoHistorico"></span></h3>
       <ol class="historico" id="historico"></ol>

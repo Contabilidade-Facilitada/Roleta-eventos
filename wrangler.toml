@@ -1,0 +1,21 @@
+# Configuração do Cloudflare Pages. Com este arquivo no repositório, as ligações
+# (banco de dados) e as variáveis abaixo passam a valer no lugar das definidas no painel da Cloudflare.
+# A chave dos aparelhos (CHAVE_OPERADOR) é um segredo: cadastre-a no painel, nunca aqui.
+# Deve ser igual ao nome do projeto no Cloudflare Pages
+name = "roleta-eventos"
+pages_build_output_dir = "."
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "roleta-cf"
+database_id = "PREENCHER-COM-O-ID-DO-BANCO"
+migrations_dir = "migrations"
+
+[vars]
+# Domínio da equipe no Cloudflare Zero Trust, por exemplo https://contabilidadefacilitada.cloudflareaccess.com
+ACCESS_EQUIPE = "PREENCHER"
+# "Application Audience (AUD) Tag" da aplicação do Access que protege /admin e /api/admin
+ACCESS_AUD = "PREENCHER"
+# Somente e-mails deste domínio entram no painel
+DOMINIO_ADMIN = "contabilidadefacilitada.com"
