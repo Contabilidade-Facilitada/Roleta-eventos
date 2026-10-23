@@ -7,7 +7,7 @@
 **Roleta de prêmios interativa do Contabilidade Facilitada para estandes e eventos presenciais.**
 
 Abra o `index.html`, aperte a barra de espaço e deixe a sorte trabalhar.
-Funciona sem internet, sem instalação e sem servidor.
+Funciona no notebook, no tablet e no celular, sem instalação.
 
 <img src="docs/tela-inicial.png" alt="Tela inicial da roleta" width="900">
 
@@ -30,6 +30,7 @@ Cada resultado ocupa duas fatias da roda (dez fatias no total). A chance real de
 ## Experiência
 
 - **Giro:** a roda recua antes de girar, desacelera aos poucos e cria suspense nos últimos pinos.
+- **Deslizar com o dedo:** em telas de toque, o participante segura a roda, arrasta e solta. Ela gira no sentido do movimento.
 - **Ponteiro:** balança a cada pino que passa, com um estalo sonoro.
 - **Lâmpadas no aro:** piscam devagar em espera, correm em sequência durante o giro e piscam juntas quando sai um prêmio.
 - **Holofote:** a fatia sorteada fica iluminada e o restante da roda escurece.
@@ -64,7 +65,43 @@ Cada resultado ocupa duas fatias da roda (dez fatias no total). A chance real de
 | `P` | Abre e fecha o painel do operador |
 | `Esc` | Fecha o resultado ou o painel |
 
-Também é possível girar clicando no botão **GIRAR** ou no logotipo no centro da roda.
+Também é possível girar clicando no botão **GIRAR** ou no logotipo no centro da roda, ou arrastando a roda com o mouse.
+
+## Tablet e celular
+
+O layout se adapta sozinho ao tamanho e à orientação da tela.
+
+| Modo | Como fica |
+|---|---|
+| **Celular em pé** | Logo e título no topo, roda no centro ocupando a largura, botão **GIRAR** embaixo, ao alcance do polegar |
+| **Celular deitado** | Texto à esquerda e roda à direita, em versão compacta |
+| **Tablet em pé** | Igual ao celular, com a lista de prêmios acima da roda nos tablets maiores |
+| **Tablet deitado** | Igual ao notebook, com a lista de prêmios em uma coluna |
+
+<div align="center">
+<img src="docs/celular.png" alt="Celular em pé" width="200">
+<img src="docs/tablet.png" alt="Tablet em pé" width="300">
+<img src="docs/celular-deitado.png" alt="Celular deitado" width="420">
+</div>
+
+**Recursos de toque**
+
+- Segure a roda, arraste e solte para girar. Um toque parado não dispara o giro.
+- Tocar no logotipo do centro ou no botão **GIRAR** também gira.
+- No Android, o aparelho vibra a cada pino e no resultado. O botão de som também desliga a vibração.
+- O painel do operador abre pelo ícone de engrenagem no canto superior direito.
+- No iPhone o navegador não permite tela cheia, por isso o botão de tela cheia some. Use **Compartilhar › Adicionar à Tela de Início**: a roleta passa a abrir como um aplicativo, sem barras do navegador. No Android, use **Menu › Adicionar à tela inicial**.
+
+**Como abrir no tablet ou no celular**
+
+Tablets e celulares não abrem bem o `index.html` direto da memória do aparelho, por isso a roleta precisa estar em um endereço web. Escolha uma das opções:
+
+1. **Hospedagem estática** (GitHub Pages, Netlify, Vercel ou o servidor do site): basta publicar a pasta como está. Este repositório é privado; no GitHub Pages, a publicação de repositórios privados depende do plano da organização, e o site publicado fica acessível a quem tiver o endereço.
+2. **Rede local do evento:** no notebook, dentro da pasta do projeto, rode `npx serve .` (ou `python -m http.server 8080`) e abra no tablet o endereço mostrado, por exemplo `http://192.168.0.10:8080`. Notebook e tablet precisam estar na mesma rede Wi-Fi.
+
+Depois que a página carrega, a roleta continua funcionando mesmo se a internet cair, desde que a página não seja recarregada.
+
+> **Atenção:** pesos, estoque e histórico ficam salvos em cada aparelho. Se usar mais de um tablet, configure cada um e exporte o histórico de cada um separadamente.
 
 ## Painel do operador
 
@@ -115,11 +152,12 @@ caneta: {
 ```
 Roleta-eventos/
 ├── index.html              Página principal
+├── manifest.webmanifest    Permite instalar na tela inicial de tablets e celulares
 ├── assets/
-│   ├── css/style.css       Layout, animações e tema
-│   ├── js/app.js           Sorteio, animação, sons, confete e painel
+│   ├── css/style.css       Layout, animações, tema e adaptação a cada tela
+│   ├── js/app.js           Sorteio, animação, gestos, sons, confete e painel
 │   ├── fonts/              Sora e Montserrat (locais, para uso sem internet)
-│   └── img/                Logotipos do Contabilidade Facilitada e da Escola Contábil
+│   └── img/                Logotipos e ícones do aplicativo
 └── docs/                   Capturas de tela deste README
 ```
 
@@ -129,7 +167,9 @@ Roleta-eventos/
 - Roda desenhada em `<canvas>`, com nitidez ajustada à densidade de pixels da tela.
 - Sons sintetizados com a Web Audio API, sem arquivos de áudio.
 - Identidade visual do Contabilidade Facilitada: azul `#102850`, laranja `#FF9933`, fontes Sora e Montserrat.
-- Layout pensado para notebooks na horizontal (testado em 1366×768 e 1920×1080), com adaptação para telas na vertical.
+- Gestos com Pointer Events (toque, caneta e mouse) e vibração com a Vibration API.
+- Layout responsivo com *container queries*: no modo em pé, a roda ocupa todo o espaço livre, seja qual for a altura da tela.
+- Testado em celulares de 360×740 a 430×932 (em pé e deitados), tablets de 768×1024 e 820×1180 (em pé e deitados) e notebooks de 1366×768 e 1920×1080.
 
 ---
 

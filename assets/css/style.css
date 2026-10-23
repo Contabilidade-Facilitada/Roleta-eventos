@@ -31,7 +31,7 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body { height: 100%; overflow: hidden; }
+html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 
 body {
   font-family: 'Montserrat', system-ui, sans-serif;
@@ -40,6 +40,9 @@ body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
 }
 
 button { font: inherit; }
@@ -127,7 +130,9 @@ kbd {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 4vw;
-  padding: 4vh 5vw;
+  padding:
+    max(4vh, env(safe-area-inset-top)) max(5vw, env(safe-area-inset-right))
+    max(4vh, env(safe-area-inset-bottom)) max(5vw, env(safe-area-inset-left));
 }
 
 .info {
@@ -314,12 +319,18 @@ kbd {
 
 /* ---------- Roleta ---------- */
 
+/* Só vira caixa no modo em pé, onde define o espaço disponível para a roda */
+.roda-espaco { display: contents; }
+
 .roda-area {
   position: relative;
   width: var(--tam);
   height: var(--tam);
   animation: entrarRoda 1.1s cubic-bezier(.2, .9, .2, 1.05) both .15s;
+  touch-action: none;
+  cursor: grab;
 }
+.roda-area:active { cursor: grabbing; }
 @keyframes entrarRoda {
   from { opacity: 0; transform: scale(.7) rotate(-40deg); }
   to   { opacity: 1; transform: none; }
@@ -819,15 +830,123 @@ kbd {
   pointer-events: none;
 }
 
-/* ---------- Telas em pé ou estreitas ---------- */
+/* ---------- Telas de toque ---------- */
+
+.dica-toque { display: none; }
+
+@media (hover: none) and (pointer: coarse) {
+  .dica-teclado { display: none; }
+  .dica-toque { display: inline; }
+  .controle { width: 44px; height: 44px; opacity: .55; }
+  .tabela input { font-size: 16px; }   /* evita o zoom automático do iOS ao focar */
+  .so-teclado { display: none; }
+}
+
+/* ---------- Tablet deitado e telas médias ---------- */
+
+@media (min-aspect-ratio: 5/4) and (max-width: 1180px) {
+  :root { --tam: min(84vh, 56vw); }
+  .app { gap: 3vw; padding-left: max(4vw, env(safe-area-inset-left)); padding-right: max(3vw, env(safe-area-inset-right)); }
+  .premios { grid-template-columns: 1fr; gap: 1vh; }
+  .premio { padding: .8vh 12px; }
+  .premio .ic { width: 32px; height: 32px; }
+  .lead { display: none; }
+}
+
+/* ---------- Celular deitado ---------- */
+
+@media (min-aspect-ratio: 5/4) and (max-height: 540px) {
+  :root { --tam: min(calc(100dvh - 40px), 56vw); }
+  .app {
+    gap: 3vw;
+    padding:
+      max(26px, env(safe-area-inset-top)) max(3vw, env(safe-area-inset-right))
+      max(14px, env(safe-area-inset-bottom)) max(4vw, env(safe-area-inset-left));
+  }
+  .info { gap: 2.4vh; }
+  .logo { width: clamp(120px, 20vw, 190px); margin: 0; }
+  .selo { font-size: .7rem; }
+  .titulo { font-size: min(4.6vw, 10vh); }
+  .lead, .premios { display: none; }
+  .acao { gap: 6px 16px; margin: 0; }
+  .botao-girar { font-size: clamp(1.1rem, 6vh, 1.6rem); padding: .7em 2em; box-shadow: 0 6px 0 #b9570b, 0 12px 28px rgba(255, 153, 51, .45), inset 0 2px 0 rgba(255, 255, 255, .55); }
+  .dica { font-size: .8rem; }
+  .controles { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); }
+  .controle { width: 38px; height: 38px; }
+}
+
+/* ---------- Em pé: celulares e tablets ----------
+   O bloco de texto se dissolve na coluna principal para a roda ficar entre
+   o título e o botão (perto do polegar). A roda ocupa todo o espaço que sobra. */
 
 @media (max-aspect-ratio: 5/4) {
-  :root { --tam: min(88vw, 54vh); }
-  .app { grid-template-columns: 1fr; justify-items: center; align-content: center; gap: 4vh; }
-  .info { align-items: center; text-align: center; gap: 1.6vh; }
-  .titulo { font-size: min(7.5vw, 5vh); }
-  .lead, .premios { display: none; }
-  .acao { justify-content: center; }
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(8px, 1.6vh, 20px);
+    padding:
+      max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+      max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+  .info { display: contents; }
+  /* As margens alinham o logo à altura dos botões do canto e afastam o selo deles */
+  .logo { order: 1; align-self: flex-start; width: clamp(130px, 40vw, 240px); margin: 6px 0 10px; }
+  .selo { order: 2; font-size: clamp(.68rem, 2.2vw, .9rem); }
+  .titulo { order: 3; text-align: center; font-size: clamp(1.55rem, 7.6vw, 3.4rem); text-wrap: balance; }
+  .lead { display: none; }
+  .premios { order: 4; display: none; }
+  .roda-espaco {
+    order: 5;
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    display: grid;
+    place-items: center;
+    container-type: size;
+  }
+  /* 95% da altura: o restante acomoda o ponteiro, que sobe acima da roda */
+  .roda-area { --tam: min(100cqw, 95cqh); margin-top: calc(var(--tam) * .05); }
+  .acao { order: 6; flex-direction: column; gap: 10px; margin: 0; }
+  .botao-girar { font-size: clamp(1.25rem, 5.4vw, 2rem); padding: .75em 2.6em; }
+  .dica { text-align: center; }
+}
+
+/* Tablet grande em pé: há espaço para a lista de prêmios */
+@media (max-aspect-ratio: 5/4) and (min-width: 600px) and (min-height: 1100px) {
+  .premios { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 860px; gap: 10px; }
+  .premio { flex-direction: column; justify-content: center; text-align: center; gap: 8px; padding: 12px 8px; font-size: clamp(.78rem, 1.7vw, .95rem); }
+}
+
+/* ---------- Resultado em telas baixas ---------- */
+
+@media (max-height: 560px) {
+  .resultado { padding: 10px; }
+  .cartao { margin-top: 46px; padding: 54px 22px 18px; border-radius: 22px; }
+  .medalha { width: 112px; height: 112px; }
+  .medalha-disco { box-shadow: 0 0 0 5px #fff, 0 0 0 10px rgba(255, 153, 51, .45), 0 12px 30px rgba(0, 0, 0, .45); }
+  .resultado-sobre { font-size: .85rem; }
+  .resultado-titulo { font-size: clamp(1.4rem, 8vh, 2.2rem); margin: .15em 0 .25em; }
+  .resultado-sub { font-size: .9rem; }
+  .resultado-imagem { width: 56px; margin-top: 8px; border-radius: 12px; }
+  .resultado-nota { margin-top: 8px; font-size: .85rem; }
+  .botao-resultado { margin-top: 12px; padding: .75em 2em; }
+}
+
+@media (max-height: 420px) {
+  .cartao { margin-top: 38px; padding-top: 46px; }
+  .medalha { width: 96px; height: 96px; }
+  .resultado-imagem.visivel { display: none; }
+}
+
+/* ---------- Painel em telas estreitas ---------- */
+
+@media (max-width: 520px) {
+  .painel-topo { padding: max(14px, env(safe-area-inset-top)) 16px 14px; }
+  .painel-corpo { padding: 4px 14px max(24px, env(safe-area-inset-bottom)); }
+  .tabela { font-size: .8rem; }
+  .tabela th, .tabela td { padding-left: 2px; padding-right: 2px; }
+  .tabela input { width: 52px; padding: 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

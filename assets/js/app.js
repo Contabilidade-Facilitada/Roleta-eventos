@@ -193,6 +193,12 @@
 
   const somTique = () => tom(1500, 0, .05, 'square', .06, 500);
 
+  // Vibração em celulares Android (o iOS não oferece essa função). Segue o botão de som.
+  function vibrar(padrao) {
+    if (!estado.som || !navigator.vibrate) return;
+    try { navigator.vibrate(padrao); } catch (e) { /* sem suporte */ }
+  }
+
   function somGiro() {
     if (!audio || !estado.som) return;
     const dur = 1.3;
@@ -402,6 +408,8 @@
   let girando = false;
   let ultimoQuadro = performance.now();
   let ultimoTique = 0;
+  let ultimaVibracao = 0;
+  let arrasto = null;            // dedo ou mouse segurando a roda
   const ponteiro = { ang: 0, vel: 0 };
 
   const indiceSobPonteiro = (r) => Math.floor((((-r % 360) + 360) % 360) / FATIA) % N;
@@ -416,11 +424,12 @@
 
     if (animacao) {
       const decorrido = t - animacao.inicio;
-      if (decorrido < RECUO_MS) {
-        rot = animacao.de - RECUO_GRAUS * Math.sin((decorrido / RECUO_MS) * Math.PI / 2);
+      const { recuoMs, recuoGraus } = animacao;
+      if (decorrido < recuoMs) {
+        rot = animacao.de - recuoGraus * Math.sin((decorrido / recuoMs) * Math.PI / 2);
       } else {
-        const p = Math.min(1, (decorrido - RECUO_MS) / animacao.duracao);
-        const inicio = animacao.de - RECUO_GRAUS;
+        const p = Math.min(1, (decorrido - recuoMs) / animacao.duracao);
+        const inicio = animacao.de - recuoGraus;
         rot = inicio + (animacao.para - inicio) * desacelerar(p);
         if (p >= 1) {
           rot = animacao.para;
@@ -429,7 +438,7 @@
           aoParar(fim);
         }
       }
-    } else if (!girando && !resultado.classList.contains('aberto')) {
+    } else if (!girando && !arrasto && !resultado.classList.contains('aberto')) {
       rot += 5 * dt;   // movimento lento de atração enquanto ninguém joga
     }
 
@@ -439,10 +448,14 @@
     if (indice !== ultimoIndice) {
       ultimoIndice = indice;
       const direcao = Math.sign(rot - anterior) || 1;
-      ponteiro.vel -= direcao * (girando ? 320 : 110);
-      if (girando && t - ultimoTique > 32) {
+      ponteiro.vel -= direcao * (girando || arrasto ? 320 : 110);
+      if ((girando || arrasto) && t - ultimoTique > 32) {
         ultimoTique = t;
         somTique();
+      }
+      if ((girando || arrasto) && t - ultimaVibracao > 70) {
+        ultimaVibracao = t;
+        vibrar(6);
       }
     }
 
@@ -454,7 +467,8 @@
     requestAnimationFrame(quadro);
   }
 
-  function girar() {
+  // sentido: 1 = horário, -1 = anti-horário. lancado: giro iniciado por um gesto, sem o recuo inicial.
+  function girar({ sentido = 1, lancado = false } = {}) {
     if (girando || resultado.classList.contains('aberto')) return;
     prepararAudio();
 
@@ -468,13 +482,18 @@
     const indice = posicoes[Math.floor(aleatorio() * posicoes.length)];
     const alvo = indice * FATIA + FATIA * (.15 + aleatorio() * .7);   // evita parar em cima da divisória
     const voltas = 6 + Math.floor(aleatorio() * 3);
-    const ajuste = (((-alvo - rot) % 360) + 360) % 360;
+    // Graus que faltam, no sentido do giro, para o alvo parar sob o ponteiro
+    const ajuste = sentido > 0
+      ? (((-alvo - rot) % 360) + 360) % 360
+      : (((rot + alvo) % 360) + 360) % 360;
 
     animacao = {
       inicio: performance.now(),
       de: rot,
-      para: rot + voltas * 360 + ajuste,
+      para: rot + sentido * (voltas * 360 + ajuste),
       duracao: 6600 + aleatorio() * 1200,
+      recuoMs: lancado ? 0 : RECUO_MS,
+      recuoGraus: lancado ? 0 : sentido * RECUO_GRAUS,
       id,
       indice
     };
@@ -502,16 +521,62 @@
       roda.dataset.modo = 'vitoria';
       rodaArea.classList.add('vitoria');
       somVitoria();
+      vibrar([60, 50, 60, 50, 180]);
     } else {
       roda.dataset.modo = 'derrota';
       rodaArea.classList.remove('tremer');
       void rodaArea.offsetWidth;
       rodaArea.classList.add('tremer');
       somDerrota();
+      vibrar(150);
     }
 
     setTimeout(() => mostrarResultado(id), p.ganha ? 1100 : 800);
   }
+
+  /* ---------- Arrastar e lançar a roda (dedo ou mouse) ---------- */
+
+  function anguloNoCentro(e) {
+    const r = rodaArea.getBoundingClientRect();
+    return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180 / Math.PI;
+  }
+
+  rodaArea.addEventListener('pointerdown', (e) => {
+    if (girando || arrasto || resultado.classList.contains('aberto') || e.target.closest('.centro')) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    prepararAudio();
+    rodaArea.setPointerCapture(e.pointerId);
+    const agora = performance.now();
+    arrasto = { id: e.pointerId, angulo: anguloNoCentro(e), total: 0, amostras: [{ t: agora, a: 0 }] };
+  });
+
+  rodaArea.addEventListener('pointermove', (e) => {
+    if (!arrasto || e.pointerId !== arrasto.id) return;
+    const angulo = anguloNoCentro(e);
+    let delta = angulo - arrasto.angulo;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    arrasto.angulo = angulo;
+    arrasto.total += delta;
+    rot += delta;
+    const agora = performance.now();
+    arrasto.amostras.push({ t: agora, a: arrasto.total });
+    while (arrasto.amostras.length > 2 && agora - arrasto.amostras[0].t > 120) arrasto.amostras.shift();
+  });
+
+  rodaArea.addEventListener('pointerup', (e) => {
+    if (!arrasto || e.pointerId !== arrasto.id) return;
+    const agora = performance.now();
+    const primeira = arrasto.amostras[0];
+    // Velocidade angular dos últimos 120 ms, em graus por segundo
+    const velocidade = ((arrasto.total - primeira.a) / Math.max(16, agora - primeira.t)) * 1000;
+    arrasto = null;
+    if (Math.abs(velocidade) > 120) girar({ sentido: Math.sign(velocidade), lancado: true });
+  });
+
+  rodaArea.addEventListener('pointercancel', (e) => {
+    if (arrasto && e.pointerId === arrasto.id) arrasto = null;
+  });
 
   /* ---------- Holofote na fatia sorteada ---------- */
 
@@ -714,7 +779,8 @@
     }).join('');
 
     const premiados = estado.historico.filter((h) => PREMIOS[h.id] && PREMIOS[h.id].ganha).length;
-    $('#resumoHistorico').textContent = `· ${estado.historico.length} giros, ${premiados} prêmios`;
+    const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+    $('#resumoHistorico').textContent = `· ${plural(estado.historico.length, 'giro', 'giros')}, ${plural(premiados, 'prêmio', 'prêmios')}`;
 
     const fmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const itens = estado.historico.slice(-100).reverse()
@@ -856,7 +922,15 @@
     if ((e.key === ' ' || e.key === 'Enter') && !(e.target instanceof HTMLInputElement)) e.preventDefault();
   });
 
+  // Toque: evita o menu de pressão longa na roda e o zoom de pinça do Safari
+  rodaArea.addEventListener('contextmenu', (e) => e.preventDefault());
+  botaoGirar.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+
   /* ---------- Início ---------- */
+
+  // O iPhone não permite tela cheia em páginas; nele, use "Adicionar à Tela de Início"
+  if (!document.fullscreenEnabled) $('#btnTelaCheia').style.display = 'none';
 
   criarLampadas();
   criarFaiscas();

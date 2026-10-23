@@ -1,0 +1,16 @@
+{
+  "name": "Roleta da Sorte | Contabilidade Facilitada",
+  "short_name": "Roleta CF",
+  "description": "Roleta de prêmios do Contabilidade Facilitada para eventos.",
+  "lang": "pt-BR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#102850",
+  "theme_color": "#102850",
+  "icons": [
+    { "src": "assets/img/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/img/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
