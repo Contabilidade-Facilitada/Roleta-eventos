@@ -31,6 +31,8 @@
   --bom-fundo: rgba(12, 163, 12, .1);
   --critico: #d03b3b;
   --sombra: 0 1px 2px rgba(16, 40, 80, .06), 0 4px 16px rgba(16, 40, 80, .05);
+  --botao-principal: #102850;
+  --botao-principal-ativo: #183c77;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -51,6 +53,8 @@
     --bom-fundo: rgba(12, 163, 12, .16);
     --critico: #ec6b6b;
     --sombra: none;
+    --botao-principal: #24539e;
+    --botao-principal-ativo: #2f64b8;
   }
 }
 :root[data-theme="dark"] {
@@ -70,6 +74,8 @@
   --bom-fundo: rgba(12, 163, 12, .16);
   --critico: #ec6b6b;
   --sombra: none;
+  --botao-principal: #24539e;
+  --botao-principal-ativo: #2f64b8;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -108,6 +114,48 @@ button, input, select { font: inherit; color: inherit; }
 .usuario { color: rgba(255, 255, 255, .75); }
 .topo .botao { border-color: rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .08); color: #fff; }
 .topo .botao:hover { background: rgba(255, 255, 255, .16); }
+
+/* ---------- Entrada ---------- */
+
+.entrada {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--pagina);
+}
+.entrada[hidden] { display: none; }
+.entrada-cartao {
+  width: min(380px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 28px 24px;
+  border-radius: 16px;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  box-shadow: var(--sombra);
+}
+.entrada-icone { width: 44px; height: 44px; }
+.entrada-cartao h1 { font-size: 1.25rem; font-weight: 700; }
+.entrada-cartao input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--borda);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: 16px;
+  font-weight: 600;
+}
+.entrada-cartao input:focus-visible { outline: 2px solid var(--laranja); outline-offset: 2px; }
+.entrada-erro { font-size: .85rem; font-weight: 700; color: var(--critico); }
+.entrada-erro:empty { display: none; }
+.entrada-cartao .botao-principal { padding: 11px 14px; border: none; background: var(--botao-principal); color: #fff; font-size: .9rem; }
+.entrada-cartao .botao-principal:hover { background: var(--botao-principal-ativo); }
+.entrada-cartao .botao-principal:disabled { opacity: .6; cursor: default; }
+body.bloqueado .topo-direita, body.bloqueado .conteudo { visibility: hidden; }
 
 /* ---------- Estrutura ---------- */
 

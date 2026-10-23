@@ -1,5 +1,5 @@
 # Copie para .dev.vars para rodar localmente com: npx wrangler pages dev
 # Chave que os aparelhos informam no painel do operador
 CHAVE_OPERADOR=troque-esta-chave
-# Libera o /admin sem login do Access, somente em localhost
-ACESSO_LOCAL_SEM_LOGIN=sim
+# Senha do painel /admin
+SENHA_ADMIN=troque-esta-senha

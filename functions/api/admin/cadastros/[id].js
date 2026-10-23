@@ -2,16 +2,17 @@ import { json, erro } from '../../../_lib/resposta.js';
 
 const idValido = (v) => /^\d{1,12}$/.test(v);
 
-// Marca ou desmarca o resgate do cupom: { "resgatado": true | false }
-export async function onRequestPatch({ request, env, params, data }) {
+// Marca ou desmarca o resgate do cupom: { "resgatado": true | false, "por": "nome de quem marcou" }
+export async function onRequestPatch({ request, env, params }) {
   if (!idValido(params.id)) return erro(400, 'Cadastro inválido.');
   let corpo;
   try { corpo = await request.json(); } catch (e) { return erro(400, 'Corpo inválido.'); }
   if (typeof corpo.resgatado !== 'boolean') return erro(400, 'Informe "resgatado".');
+  const por = typeof corpo.por === 'string' ? corpo.por.trim().slice(0, 60) : '';
 
   const r = corpo.resgatado
     ? await env.DB.prepare('UPDATE cadastros SET resgatado_em = ?, resgatado_por = ? WHERE id = ? AND resgatado_em IS NULL')
-        .bind(Date.now(), data.usuario, params.id).run()
+        .bind(Date.now(), por || null, params.id).run()
     : await env.DB.prepare('UPDATE cadastros SET resgatado_em = NULL, resgatado_por = NULL WHERE id = ?')
         .bind(params.id).run();
 

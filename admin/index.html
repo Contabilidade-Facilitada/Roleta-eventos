@@ -20,8 +20,28 @@
       <span class="atualizacao" id="statusAtualizacao" role="status">Carregando…</span>
       <button class="botao" id="btnAtualizar" type="button">Atualizar</button>
       <span class="usuario" id="usuario"></span>
+      <button class="botao" id="btnSair" type="button">Sair</button>
     </div>
   </header>
+
+  <!-- Entrada: nome (registrado nos resgates) e senha do painel -->
+  <div class="entrada" id="entrada" hidden>
+    <form class="entrada-cartao" id="formEntrada">
+      <img class="entrada-icone" src="/assets/img/logo-cf-icone.png" alt="">
+      <h1>Painel da Roleta</h1>
+      <p class="cartao-sub">Informe seu nome e a senha do painel.</p>
+      <label class="filtro">
+        <span>Seu nome</span>
+        <input id="entradaNome" maxlength="60" autocomplete="name" required>
+      </label>
+      <label class="filtro">
+        <span>Senha</span>
+        <input id="entradaSenha" type="password" autocomplete="current-password" required>
+      </label>
+      <p class="entrada-erro" id="entradaErro" role="alert"></p>
+      <button class="botao botao-principal" type="submit">Entrar</button>
+    </form>
+  </div>
 
   <main class="conteudo" id="conteudo">
     <!-- Filtros: valem para todos os números, gráficos e tabelas abaixo -->

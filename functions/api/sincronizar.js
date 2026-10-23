@@ -3,6 +3,7 @@
 
 import { PREMIOS } from '../_lib/premios.js';
 import { json, erro } from '../_lib/resposta.js';
+import { senhaConfere } from '../_lib/senha.js';
 
 const MAX_GIROS = 500;
 const MAX_CADASTROS = 200;
@@ -15,13 +16,6 @@ const texto = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 // Momento informado pelo aparelho: aceita de 2025 até 1 dia à frente do relógio do servidor
 function momentoValido(v) {
   return Number.isInteger(v) && v > Date.UTC(2025, 0, 1) && v < Date.now() + 86400000;
-}
-
-function mesmaChave(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
-  let dif = 0;
-  for (let i = 0; i < a.length; i++) dif |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return dif === 0;
 }
 
 function validarGiro(g) {
@@ -45,7 +39,7 @@ function validarCadastro(c) {
 
 export async function onRequestPost({ request, env }) {
   if (!env.CHAVE_OPERADOR || !env.DB) return erro(503, 'Servidor sem configuração.');
-  if (!mesmaChave(request.headers.get('X-Chave-Operador') || '', env.CHAVE_OPERADOR)) {
+  if (!(await senhaConfere(request.headers.get('X-Chave-Operador') || '', env.CHAVE_OPERADOR))) {
     return erro(401, 'Chave do aparelho inválida.');
   }
 

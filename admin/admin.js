@@ -1,6 +1,6 @@
 /* ==========================================================
    Painel da Roleta | Contabilidade Facilitada
-   Lê /api/admin/dados (protegido pelo Cloudflare Access) e monta
+   Lê /api/admin/dados (protegido pela senha do painel) e monta
    indicadores, gráficos e a lista de ganhadores no navegador.
    ========================================================== */
 (() => {
@@ -9,13 +9,14 @@
   const INTERVALO_ATUALIZACAO_MS = 30000;
   const LINHAS_POR_PAGINA = 50;
   const CHAVE_FILTROS = 'roleta-cf-admin-filtros';
+  const CHAVE_NOME = 'roleta-cf-admin-nome';     // localStorage: lembrado neste navegador
+  const CHAVE_SENHA = 'roleta-cf-admin-senha';   // sessionStorage: some ao fechar a aba
   const HORA = 3600000;
   const DIA = 24 * HORA;
 
   const $ = (s) => document.querySelector(s);
 
   const dados = {
-    usuario: '',
     premios: {},
     giros: [],          // { t, premio, evento, aparelho }
     ultimoSeq: 0,
@@ -82,23 +83,79 @@
   const passaFiltros = (t, evento, aparelho, inicio) =>
     t >= inicio && (!filtros.evento || evento === filtros.evento) && (!filtros.aparelho || aparelho === filtros.aparelho);
 
+  /* ---------- Entrada com nome e senha ---------- */
+
+  const ler = (armazenamento, chave) => { try { return armazenamento.getItem(chave) || ''; } catch (e) { return ''; } };
+  const gravar = (armazenamento, chave, valor) => {
+    try { valor ? armazenamento.setItem(chave, valor) : armazenamento.removeItem(chave); } catch (e) { /* armazenamento indisponível */ }
+  };
+
+  const credenciais = { nome: ler(localStorage, CHAVE_NOME), senha: ler(sessionStorage, CHAVE_SENHA) };
+
+  // Cabeçalhos de toda requisição ao servidor; a senha vai codificada para aceitar qualquer caractere
+  const cabecalhos = (extra = {}) => ({ 'X-Senha-Admin': encodeURIComponent(credenciais.senha), ...extra });
+
+  function pedirEntrada(mensagem = '') {
+    credenciais.senha = '';
+    gravar(sessionStorage, CHAVE_SENHA, '');
+    document.body.classList.add('bloqueado');
+    $('#entrada').hidden = false;
+    $('#entradaErro').textContent = mensagem;
+    $('#entradaNome').value = credenciais.nome;
+    $('#entradaSenha').value = '';
+    (credenciais.nome ? $('#entradaSenha') : $('#entradaNome')).focus();
+  }
+
+  async function entrar(e) {
+    e.preventDefault();
+    const nome = $('#entradaNome').value.trim();
+    const senha = $('#entradaSenha').value;
+    if (!nome || !senha) {
+      $('#entradaErro').textContent = 'Informe seu nome e a senha.';
+      return;
+    }
+    credenciais.nome = nome;
+    credenciais.senha = senha;
+    gravar(localStorage, CHAVE_NOME, nome);
+    $('#entradaErro').textContent = '';
+    const botao = $('#formEntrada button[type=submit]');
+    botao.disabled = true;
+    const ok = await carregar();
+    botao.disabled = false;
+    if (!ok) {
+      credenciais.senha = '';   // a atualização automática só volta depois de uma entrada aceita
+      return;
+    }
+    gravar(sessionStorage, CHAVE_SENHA, senha);
+    $('#entrada').hidden = true;
+    document.body.classList.remove('bloqueado');
+  }
+
+  function sair() {
+    pedirEntrada();
+  }
+
   /* ---------- Carga dos dados ---------- */
 
+  // Devolve true se os dados foram carregados
   async function carregar() {
-    if (carregando) return;
+    if (carregando || !credenciais.senha) return false;
     carregando = true;
     document.body.classList.add('carregando');
     try {
       let mais = true;
       while (mais) {
-        const r = await fetch(`/api/admin/dados?desde=${dados.ultimoSeq}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
-        if (r.status === 401 || r.status === 403) {
-          status('Acesso não autorizado para este usuário.', 'erro');
-          return;
+        const r = await fetch(`/api/admin/dados?desde=${dados.ultimoSeq}`, { headers: cabecalhos({ Accept: 'application/json' }), cache: 'no-store' });
+        if (r.status === 401) {
+          pedirEntrada('Senha incorreta.');
+          return false;
+        }
+        if (r.status === 503) {
+          pedirEntrada('A senha do painel ainda não foi configurada no servidor.');
+          return false;
         }
         if (!r.ok) throw new Error(`erro ${r.status}`);
         const d = await r.json();
-        dados.usuario = d.usuario;
         dados.premios = d.premios;
         d.giros.forEach(([seq, t, premio, evento, aparelho]) => {
           dados.giros.push({ t, premio, evento, aparelho });
@@ -110,9 +167,11 @@
       ultimaAtualizacao = Date.now();
       status(`Atualizado às ${fmtHoraSeg.format(ultimaAtualizacao)}`);
       renderizar();
+      return true;
     } catch (e) {
-      // Com a sessão do Access vencida, a requisição é redirecionada ao login e falha aqui
-      status('Não foi possível atualizar. Se a sessão expirou, recarregue a página.', 'erro');
+      status('Não foi possível atualizar. Verifique a conexão.', 'erro');
+      if (!$('#entrada').hidden) $('#entradaErro').textContent = 'Não foi possível conectar ao servidor.';
+      return false;
     } finally {
       carregando = false;
       document.body.classList.remove('carregando');
@@ -128,7 +187,7 @@
   /* ---------- Renderização ---------- */
 
   function renderizar() {
-    $('#usuario').textContent = dados.usuario;
+    $('#usuario').textContent = credenciais.nome;
     renderizarOpcoes();
 
     const inicio = inicioPeriodo();
@@ -490,15 +549,17 @@
     try {
       let r;
       if (botao.dataset.acao === 'excluir') {
-        r = await fetch(`/api/admin/cadastros/${id}`, { method: 'DELETE' });
+        r = await fetch(`/api/admin/cadastros/${id}`, { method: 'DELETE', headers: cabecalhos() });
+        if (r.status === 401) return pedirEntrada('Senha incorreta.');
         if (!r.ok) throw new Error(`erro ${r.status}`);
         dados.cadastros = dados.cadastros.filter((c) => c.id !== id);
       } else {
         r = await fetch(`/api/admin/cadastros/${id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ resgatado: botao.dataset.acao === 'resgatar' })
+          headers: cabecalhos({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ resgatado: botao.dataset.acao === 'resgatar', por: credenciais.nome })
         });
+        if (r.status === 401) return pedirEntrada('Senha incorreta.');
         if (!r.ok) throw new Error(`erro ${r.status}`);
         const atualizado = await r.json();
         cadastro.resgatado_em = atualizado.resgatado_em;
@@ -579,6 +640,8 @@
   });
   $('#tabelaCadastros').addEventListener('click', acaoCadastro);
   $('#btnAtualizar').addEventListener('click', carregar);
+  $('#btnSair').addEventListener('click', sair);
+  $('#formEntrada').addEventListener('submit', entrar);
   $('#btnExportarCadastros').addEventListener('click', exportarCadastros);
   $('#btnExportarGiros').addEventListener('click', exportarGiros);
 
@@ -593,5 +656,6 @@
   });
 
   renderizarOpcoes();
-  carregar();
+  if (credenciais.senha) carregar();
+  else pedirEntrada();
 })();

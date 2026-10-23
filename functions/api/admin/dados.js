@@ -6,7 +6,7 @@ import { json } from '../../_lib/resposta.js';
 
 const LIMITE_GIROS = 5000;
 
-export async function onRequestGet({ request, env, data }) {
+export async function onRequestGet({ request, env }) {
   const desde = Math.max(0, parseInt(new URL(request.url).searchParams.get('desde'), 10) || 0);
 
   const [giros, cadastros] = await env.DB.batch([
@@ -22,7 +22,6 @@ export async function onRequestGet({ request, env, data }) {
 
   const linhas = giros.results.slice(0, LIMITE_GIROS);
   return json({
-    usuario: data.usuario,
     premios: PREMIOS,
     // Formato compacto: [seq, momento, premio, evento, aparelho]
     giros: linhas.map((g) => [g.seq, g.momento, g.premio, g.evento, g.aparelho]),

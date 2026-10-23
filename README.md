@@ -69,7 +69,7 @@ Quando sai um prêmio com cupom (**20% de desconto** ou **1 mês de Escola Cont�
 
 ## Painel `/admin`
 
-Em **https://roletacf.contabilidadefacilitada.com/admin**, protegido por login com e-mail `@contabilidadefacilitada.com`:
+Em **https://roletacf.contabilidadefacilitada.com/admin**, protegido por uma senha única. Na entrada, cada pessoa informa também o próprio nome, que fica registrado nos resgates que ela marcar. A senha fica guardada só enquanto a aba estiver aberta; **Sair** a apaga na hora.
 
 - **Filtros** de período (hoje, 7 dias, 30 dias, tudo), evento e aparelho, que valem para todos os números da página.
 - **Indicadores:** giros, prêmios distribuídos, cupons emitidos (e o percentual dos cupons sorteados que foram cadastrados) e cupons resgatados.
@@ -85,16 +85,16 @@ Feita uma única vez, por quem administra a conta da Cloudflare. Os comandos usa
 
 1. **Banco de dados.** Rode `npx wrangler@4 login` e depois `npx wrangler@4 d1 create roleta-cf`. Copie o `database_id` exibido para o [`wrangler.toml`](wrangler.toml).
 2. **Tabelas.** Rode `npx wrangler@4 d1 migrations apply roleta-cf --remote`.
-3. **Chave dos aparelhos.** No painel da Cloudflare, em **Workers & Pages › (projeto da roleta) › Settings › Variables and Secrets**, crie o segredo `CHAVE_OPERADOR` com uma senha longa. É ela que se digita em **Chave do aparelho** no painel do operador.
-4. **Login do `/admin`.** Em **Zero Trust › Access › Applications**, crie uma aplicação **Self-hosted** com dois destinos: `roletacf.contabilidadefacilitada.com/admin` e `roletacf.contabilidadefacilitada.com/api/admin`. Crie uma política **Allow** com a regra **Emails ending in** `@contabilidadefacilitada.com`.
-5. **Variáveis do Access.** No [`wrangler.toml`](wrangler.toml), preencha `ACCESS_EQUIPE` com o domínio da equipe (em **Zero Trust › Settings › Custom Pages**, no formato `https://<equipe>.cloudflareaccess.com`) e `ACCESS_AUD` com o **Application Audience (AUD) Tag** da aplicação criada no passo 4.
-6. Envie as alterações para a branch `main`. O Cloudflare Pages publica sozinho.
+3. **Segredos.** No painel da Cloudflare, em **Workers & Pages › (projeto da roleta) › Settings › Variables and Secrets**, crie dois segredos, cada um com uma senha longa e diferente da outra (16 caracteres ou mais):
+   - `CHAVE_OPERADOR`: digitada em **Chave do aparelho**, no painel do operador de cada tablet.
+   - `SENHA_ADMIN`: digitada na entrada do `/admin`.
+4. Envie as alterações para a branch `main`. O Cloudflare Pages publica sozinho.
 
-> **Atenção:** com o `wrangler.toml` no repositório, as ligações e variáveis definidas nele substituem as do painel da Cloudflare. Não publique com os valores `PREENCHER`. Sem o Access configurado, o `/admin` recusa todos os acessos; a roleta continua funcionando e guarda a fila no aparelho.
+> **Atenção:** com o `wrangler.toml` no repositório, as ligações definidas nele substituem as do painel da Cloudflare. Não publique com o valor `PREENCHER`. Sem a `SENHA_ADMIN`, o `/admin` recusa todos os acessos; sem a `CHAVE_OPERADOR`, a roleta continua funcionando e guarda a fila no aparelho.
 
-O servidor confere o login do Access em toda requisição do painel, inclusive pelo endereço `*.pages.dev`, e só aceita alterações feitas a partir do próprio painel.
+Para trocar uma senha, altere o segredo no painel da Cloudflare e publique de novo (**Deployments › Retry deployment**). Quem estiver com o `/admin` aberto volta para a tela de entrada.
 
-**Desenvolvimento local.** Copie `.dev.vars.example` para `.dev.vars`, rode `npx wrangler@4 d1 migrations apply roleta-cf --local` e depois `npx wrangler@4 pages dev .`. Em `localhost`, a variável `ACESSO_LOCAL_SEM_LOGIN=sim` libera o `/admin` sem login. O Wrangler local depende do Microsoft Visual C++ Redistributable no Windows.
+**Desenvolvimento local.** Copie `.dev.vars.example` para `.dev.vars`, rode `npx wrangler@4 d1 migrations apply roleta-cf --local` e depois `npx wrangler@4 pages dev .`. O Wrangler local depende do Microsoft Visual C++ Redistributable no Windows.
 
 ## Atalhos
 
@@ -203,9 +203,8 @@ Roleta-eventos/
 ├── admin/                  Painel /admin (página, estilos e scripts)
 ├── functions/              Rotas do servidor (Cloudflare Pages Functions)
 │   ├── api/sincronizar.js  Recebe giros e cadastros dos aparelhos
-│   ├── api/admin/          Dados do painel, resgate e exclusão de cadastros
-│   ├── admin/              Proteção da página /admin
-│   └── _lib/               Prêmios aceitos, verificação do login e respostas
+│   ├── api/admin/          Senha do painel, dados, resgate e exclusão de cadastros
+│   └── _lib/               Prêmios aceitos, conferência de senha e respostas
 ├── migrations/             Tabelas do banco de dados D1
 ├── wrangler.toml           Configuração do Cloudflare Pages e do banco
 └── docs/                   Capturas de tela deste README
@@ -214,7 +213,7 @@ Roleta-eventos/
 ## Tecnologia
 
 - HTML, CSS e JavaScript puros, sem bibliotecas nem etapa de build.
-- Servidor em Cloudflare Pages Functions, banco de dados Cloudflare D1 e login do painel pelo Cloudflare Access.
+- Servidor em Cloudflare Pages Functions, banco de dados Cloudflare D1.
 - Gráficos do painel desenhados em SVG, sem bibliotecas.
 - Roda desenhada em `<canvas>`, com nitidez ajustada à densidade de pixels da tela.
 - Sons sintetizados com a Web Audio API, sem arquivos de áudio.
