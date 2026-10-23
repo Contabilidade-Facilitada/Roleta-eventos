@@ -10,5 +10,5 @@ compatibility_date = "2026-10-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "roleta-cf"
-database_id = "PREENCHER-COM-O-ID-DO-BANCO"
+database_id = "fb43ad95-9d38-4d1a-a009-196470c7c9a8"
 migrations_dir = "migrations"
